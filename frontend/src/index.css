@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+}
+
+::selection {
+  background-color: theme('colors.clinical.100');
+}
+
+/* Tabular alignment for numeric/data columns — a functional choice for a
+   records-dense app, not a decorative one. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
