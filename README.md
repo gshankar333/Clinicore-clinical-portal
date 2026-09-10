@@ -61,5 +61,5 @@ docker compose up                     #To start and create the containers
 ```
 ## Not yet implemented (by design, per process plan)
 
- GitHub Actions, and the entire SAST/DAST/IAST/RASP pipeline.
+SAST/DAST/IAST/RASP pipeline.
 
