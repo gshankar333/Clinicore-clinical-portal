@@ -191,8 +191,7 @@ export default function PatientDetailPage({ mainSegment }) {
     setError(null);
 
     try {
-      const res = await api.updatePatientStatus(id, newStatus);
-      // Reconcile with whatever the server actually persisted.
+      const res = await api.updatePatientStatus(patientId||id, newStatus);
       setData((prev) => ({
         ...prev,
         patient: { ...prev.patient, ...res.patient },

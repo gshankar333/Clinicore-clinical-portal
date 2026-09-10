@@ -14,7 +14,7 @@ async function request(path, { method = 'GET', body } = {}) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`http://localhost:4000/api${path}`, {
+  const res = await fetch(`/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

@@ -47,9 +47,19 @@ npm run dev
 ```
 Visit `http://localhost:5173`. Sample Logins for  mail id's (`admin@clinic.test`, `dr.reyes@clinic.test`) are (password `Password123!`).
 
+**Docker**
+```bash
+docker compose up --build             # To create the images and initialize the containers
+or
+docker compose -f docker-compose.yml up --build
 
+docker compose run --rm seeder        #To seed patients data
+docker compose ps                     #To check the process
+docker compose down                   #To stop and remove the containers
+docker compose down -v                #To stop and remove the containers as well volume
+docker compose up                     #To start and create the containers
+```
 ## Not yet implemented (by design, per process plan)
 
-Docker, docker-compose for the backend, GitHub Actions, and the entire
-SAST/DAST/IAST/RASP pipeline.
+ GitHub Actions, and the entire SAST/DAST/IAST/RASP pipeline.
 
