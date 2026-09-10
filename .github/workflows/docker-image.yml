@@ -1,0 +1,64 @@
+name: Clinico Healthcare Portal CI
+
+on:
+  push:
+
+jobs:
+  security-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Build and start the complete stack
+      - name: Start Docker Compose stack
+        run: docker compose up --build -d
+
+      # 3. Wait for DB and backend to become healthy
+      - name: Wait for services to become healthy
+        run: |
+          echo "Waiting for services..."
+
+          for i in {1..30}; do
+            DB_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q db)" 2>/dev/null || echo "starting")
+            BACKEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q backend)" 2>/dev/null || echo "starting")
+
+            echo "DB: $DB_STATUS"
+            echo "Backend: $BACKEND_STATUS"
+
+            if [ "$DB_STATUS" = "healthy" ] && [ "$BACKEND_STATUS" = "healthy" ]; then
+              echo "DB and backend are healthy."
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Services did not become healthy."
+              docker compose ps
+              docker compose logs db
+              docker compose logs backend
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+      # 4. Reset and seed the demo database
+      - name: Seed demo database
+        run: docker compose --profile seed run --rm seeder
+
+      # 5. Confirm the backend responds
+      - name: Check backend health
+        run: |
+          curl --fail --retry 10 --retry-delay 2 \
+            http://localhost:4000/api/health
+
+      # 6. Show container status if everything succeeded
+      - name: Show running services
+        run: docker compose ps
+
+      # 7. Always clean up containers, networks and volumes
+      - name: Clean up
+        if: always()
+        run: docker compose down -v
