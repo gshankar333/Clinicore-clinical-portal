@@ -24,7 +24,7 @@ jobs:
             --config p/owasp-top-ten \
             --config p/javascript \
             --config p/secrets \
-            --config .semgrep/custom-rules.yml \
+            --config semgrep/custom-rules.yml \
             --sarif --output semgrep-results.sarif \
             --error
 
