@@ -1,0 +1,203 @@
+rules:
+  - id: unsalted-hash-password
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      Password hashed with an unsalted, single-round digest (sha256). This
+      is vulnerable to rainbow-table attacks and offers no protection
+      against offline brute-force. Use bcrypt or argon2 with a per-user
+      salt instead. (A04 - Cryptographic Failures)
+    patterns:
+      - pattern: 'crypto.createHash("sha256").update($X).digest($Y)'
+
+  - id: sql-string-concatenation
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      SQL query built via string concatenation/template literal with a
+      variable inside it. Use a parameterized query ($1, $2, ...) instead
+      to prevent SQL injection. (A05 - Injection)
+    patterns:
+      - pattern-either:
+          - pattern: '$POOL.query("..." + $X + "...")'
+          - pattern-regex: '(const|let|var)\s+\w+\s*=\s*`[^`]*\b(SELECT|INSERT|UPDATE|DELETE)\b[^`]*\$\{[^`]*`'
+
+  - id: dangerous-new-function
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      `new Function(...)` constructs and executes code from a runtime
+      string, equivalent to eval(). If any part of that string is
+      influenced by user input, this is arbitrary code execution.
+      (A08 - Software or Data Integrity Failures)
+    patterns:
+      - pattern: 'new Function(...)'
+
+  - id: dangerously-set-inner-html
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      dangerouslySetInnerHTML renders raw HTML without sanitization. If
+      the source content isn't escaped server-side, this is a stored/
+      reflected XSS sink. (A05 - Injection / Stored XSS)
+    patterns:
+      - pattern: '<$EL dangerouslySetInnerHTML={{ __html: $X }} />'
+
+  - id: weak-jwt-secret-in-env-example
+    languages: [generic]
+    severity: WARNING
+    message: >
+      JWT_SECRET value looks like a short, guessable placeholder rather
+      than a strong random secret. Even in an example/template file, this
+      encourages developers to copy a weak value straight into production
+      instead of generating a real one. (A02 / A07)
+    paths:
+      include:
+        - "*.env.example"
+    pattern-regex: 'JWT_SECRET=.{1,20}$'
+
+  - id: fail-open-catch-block
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      Empty catch block — an exception here is silently swallowed instead
+      of handled. In security-sensitive code (auth/verification), this
+      often means the error path fails OPEN (the request proceeds anyway)
+      rather than failing closed (the request is denied). (A10 -
+      Mishandling of Exceptional Conditions)
+    patterns:
+      - pattern: |
+          try {
+            ...
+          } catch ($ERR) {
+          }
+
+  - id: ssrf-unvalidated-fetch
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      fetch() called with a URL taken directly from request input
+      (body/query/params) with no allow-list or private-IP-range check.
+      The server can be made to reach internal-only endpoints on the
+      caller's behalf. (A01 - Broken Access Control / SSRF)
+    patterns:
+      - pattern-either:
+          - pattern: 'fetch(req.body.$X)'
+          - pattern: 'fetch(req.body.$X, ...)'
+          - pattern: 'fetch(req.query.$X)'
+          - pattern: 'fetch(req.params.$X)'
+          - pattern: |
+              const { $URL } = req.body;
+              ...
+              fetch($URL)
+
+  - id: verbose-error-stack-in-response
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      Sending err.stack (or the raw error object) back in an HTTP
+      response leaks internal file paths, dependency versions, and query
+      fragments to the client — useful attacker reconnaissance. Log the
+      full error server-side only; return a generic message to the
+      client. (A02 - Security Misconfiguration)
+    patterns:
+      - pattern-either:
+          - pattern: 'res.json({..., stack: $X, ...})'
+          - pattern: 'res.status(...).json({..., stack: $X, ...})'
+
+  - id: weak-hash-for-security-token
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      MD5 used to generate a security-sensitive token (e.g. a password
+      reset token). MD5 is fast and unsalted — if the input is guessable
+      (an email address, a timestamp rounded to the minute, a sequential
+      ID), an attacker can compute the same token independently without
+      ever intercepting it. Use crypto.randomBytes() for anything used as
+      a security token. (A06 - Insecure Design)
+    patterns:
+      - pattern: crypto.createHash("md5")
+
+  - id: permissive-cors-no-options
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      cors() called with no configuration allows requests from ANY origin
+      by default. For an app handling sensitive data (patient records),
+      this should be restricted to a known, explicit list of allowed
+      origins. (A05 / A01 - broadens the attack surface for
+      credentialed cross-origin requests)
+    patterns:
+      - pattern: cors()
+
+  - id: known-vulnerable-lodash-version
+    languages: [generic]
+    severity: ERROR
+    message: >
+      lodash pinned to a version with known prototype-pollution CVEs
+      (e.g. CVE-2019-10744, CVE-2020-8203) in merge()/mergeWith()/
+      zipObjectDeep(). Upgrade to >=4.17.21, or remove the dependency if
+      it's only used for the vulnerable-by-design demo. (A03 - Software
+      Supply Chain Failures)
+    paths:
+      include:
+        - "package.json"
+    pattern-regex: '"lodash":\s*"4\.17\.(1[0-9]|2[0])"'
+
+  - id: javascript-unsafe-regex
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      Potentially unsafe regular expression detected. Complex or nested
+      quantifiers can cause excessive backtracking and CPU consumption.
+      Review the expression for Regular Expression Denial of Service (ReDoS).
+    patterns:
+      - pattern-regex: '/\([^)]*[+*][^)]*\)[+*]/'
+
+  - id: regex-nested-quantifier
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      Regular expression contains nested quantifiers that may result in
+      catastrophic backtracking. Simplify or redesign the expression and
+      test it against adversarial input.
+    patterns:
+      - pattern-regex: '/.*\([^)]*[+*][^)]*\)[+*].*/'
+
+  - id: unbounded-json-parse
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      JSON.parse() is being performed directly on potentially large input.
+      Consider enforcing request/body size limits before parsing to prevent
+      excessive memory or CPU consumption.
+    patterns:
+      - pattern-either:
+          - pattern: 'JSON.parse(req.body.$X)'
+          - pattern: 'JSON.parse(req.query.$X)'
+          - pattern: 'JSON.parse(req.params.$X)'
+
+  - id: unrestricted-array-processing
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      User-controlled data is passed directly into an array-processing
+      operation. Consider validating input size and structure to prevent
+      excessive CPU or memory consumption.
+    patterns:
+      - pattern-either:
+          - pattern: 'req.body.$X.map(...)'
+          - pattern: 'req.body.$X.forEach(...)'
+          - pattern: 'req.body.$X.filter(...)'
+          - pattern: 'req.body.$X.reduce(...)'
+
+  - id: promise-without-catch
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      Promise chain appears to lack rejection handling. Unhandled promise
+      rejections can cause unexpected application behavior or terminate the
+      process depending on the runtime configuration.
+    patterns:
+      - pattern: '$PROMISE.then(...)'
+      - pattern-not: '$PROMISE.then(...).catch(...)'
