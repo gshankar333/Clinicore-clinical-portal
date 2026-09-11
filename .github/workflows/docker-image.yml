@@ -54,11 +54,22 @@ jobs:
           curl --fail --retry 10 --retry-delay 2 \
             http://localhost:4000/api/health
 
-      # 6. Show container status if everything succeeded
+      # 6. Confirm the frontend responds
+      - name: Check frontend health
+        run: |
+          curl --fail --retry 10 --retry-delay 2 \
+            http://localhost:8080/
+
+      # 7. Show container status if everything succeeded
       - name: Show running services
         run: docker compose ps
 
-      # 7. Always clean up containers, networks and volumes
+      # 8. Dump logs if anything above failed, before teardown erases the evidence
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      # 9. Always clean up containers, networks and volumes
       - name: Clean up
         if: always()
         run: docker compose down -v
