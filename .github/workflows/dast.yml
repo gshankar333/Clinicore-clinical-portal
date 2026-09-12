@@ -25,6 +25,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Allow ZAP container to write reports
+        run: chmod -R a+w ${{ github.workspace }}
+
       - name: Build images and start containers
         run: docker compose up --build -d
 
@@ -79,7 +82,7 @@ jobs:
             -d "{\"email\":\"$DOCTOR_B_EMAIL\",\"password\":\"$DOCTOR_B_PASSWORD\"}" \
             | node -pe "JSON.parse(require('fs').readFileSync(0)).token")
           echo "::add-mask::$TOKEN_B"
-          
+
           sed -e "s|REPLACE_WITH_DOCTOR_A_TOKEN|$TOKEN_A|g" \
               -e "s|REPLACE_WITH_DOCTOR_B_TOKEN|$TOKEN_B|g" \
               -e "s|host.docker.internal|localhost|g" \
