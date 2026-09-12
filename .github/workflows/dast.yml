@@ -1,0 +1,112 @@
+name: DAST - OWASP ZAP (baseline + authenticated + IDOR)
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - 'openapi-spec.yaml'
+      - 'zap-automation-plan.yaml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dast:
+    name: OWASP ZAP - baseline, authenticated scan, and IDOR check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build images and start containers
+        run: docker compose up --build -d
+
+      - name: Wait for db and backend to report healthy
+        run: |
+          for i in $(seq 1 30); do
+            DB_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q db)" 2>/dev/null || echo "starting")
+            BACKEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q backend)" 2>/dev/null || echo "starting")
+            echo "Attempt $i: db=$DB_STATUS backend=$BACKEND_STATUS"
+            if [ "$DB_STATUS" = "healthy" ] && [ "$BACKEND_STATUS" = "healthy" ]; then
+              echo "Stack is healthy."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for services to become healthy."
+          docker compose logs
+          exit 1
+
+      - name: Seed demo data
+        run: docker compose run --rm seeder
+
+      # --- Unauthenticated baseline pass  ---
+      - name: ZAP baseline scan - frontend
+        run: |
+          docker run --network host -v "${{ github.workspace }}:/zap/wrk/:rw" zaproxy/zap-stable \
+            zap-baseline.py -t http://localhost:8080 -r zap-baseline-frontend.html || true
+
+      - name: ZAP baseline scan - backend
+        run: |
+          docker run --network host -v "${{ github.workspace }}:/zap/wrk/:rw" zaproxy/zap-stable \
+            zap-baseline.py -t http://localhost:4000 -r zap-baseline-backend.html || true
+
+      # --- Authenticated pass: log in as both doctors, inject tokens
+      #     into a runtime copy of the automation plan , adapt the target
+      #     host for Linux, then run the plan. ---
+      - name: Prepare authenticated automation plan
+        env:
+          DOCTOR_A_EMAIL: ${{ secrets.DOCTOR_A_EMAIL }}
+          DOCTOR_A_PASSWORD: ${{ secrets.DOCTOR_A_PASSWORD }}
+          DOCTOR_B_EMAIL: ${{ secrets.DOCTOR_B_EMAIL }}
+          DOCTOR_B_PASSWORD: ${{ secrets.DOCTOR_B_PASSWORD }}
+        run: |
+          TOKEN_A=$(curl -sf -X POST http://localhost:4000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$DOCTOR_A_EMAIL\",\"password\":\"$DOCTOR_A_PASSWORD\"}" \
+            | node -pe "JSON.parse(require('fs').readFileSync(0)).token")
+          echo "::add-mask::$TOKEN_A"
+
+          TOKEN_B=$(curl -sf -X POST http://localhost:4000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$DOCTOR_B_EMAIL\",\"password\":\"$DOCTOR_B_PASSWORD\"}" \
+            | node -pe "JSON.parse(require('fs').readFileSync(0)).token")
+          echo "::add-mask::$TOKEN_B"
+          
+          sed -e "s|REPLACE_WITH_DOCTOR_A_TOKEN|$TOKEN_A|g" \
+              -e "s|REPLACE_WITH_DOCTOR_B_TOKEN|$TOKEN_B|g" \
+              -e "s|host.docker.internal|localhost|g" \
+              zap-automation-plan.yaml > zap-automation-plan.ci.yaml
+
+          sed "s|host.docker.internal|localhost|g" openapi-spec.yaml > openapi-spec.ci.yaml
+          sed -i "s|openapi-spec.yaml|openapi-spec.ci.yaml|g" zap-automation-plan.ci.yaml
+
+      - name: ZAP authenticated scan + IDOR check
+        run: |
+          docker run --network host -v "${{ github.workspace }}:/zap/wrk/:rw" zaproxy/zap-stable \
+            zap.sh -cmd -autorun /zap/wrk/zap-automation-plan.ci.yaml || true
+
+      - name: Upload all ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: |
+            zap-baseline-frontend.html
+            zap-baseline-backend.html
+            zap-combined-report.html
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,109 @@
+openapi: 3.0.0
+info:
+  title: ClinicoHealthcare Portal API
+  version: "1.0"
+servers:
+  - url: http://host.docker.internal:4000/api
+paths:
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, example: "dr.reyes@clinic.test" }
+                password: { type: string, example: "Password123!" }
+      responses:
+        "200": { description: OK }
+
+  /patients/search:
+    get:
+      summary: Search patients (SQLi target)
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, example: "John" }
+      responses:
+        "200": { description: OK }
+
+  /patients/{id}:
+    get:
+      summary: Get patient by ID (IDOR target)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        "200": { description: OK }
+
+  /patients/{id}/notes:
+    post:
+      summary: Add medical note (stored XSS target)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+              examples:
+                scriptTag:
+                  value: { content: "<script>alert(document.cookie)</script>" }
+                imgOnError:
+                  value: { content: "<img src=x onerror=alert(document.cookie)>" }
+                svgOnLoad:
+                  value: { content: "<svg onload=alert(document.cookie)>" }
+      responses:
+        "201": { description: Created }
+
+  /patients/{id}/lab-results/fetch:
+    post:
+      summary: Fetch lab result from external URL (SSRF target)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, example: 1 }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string, example: "http://169.254.169.254/latest/meta-data/" }
+      responses:
+        "201": { description: Created }
+
+  /patients/{id}/export:
+    get:
+      summary: Export patient record (A10 auth-bypass target)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, example: 1 }
+      responses:
+        "200": { description: OK }
+
+  /admin/import:
+    post:
+      summary: Import patient records (code-injection target)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patients: { type: array, items: { type: object } }
+                transform: { type: string, example: "return patient;" }
+      responses:
+        "201": { description: Created }

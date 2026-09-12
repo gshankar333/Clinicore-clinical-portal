@@ -1,0 +1,59 @@
+# ZAP Automation Framework plan combining:
+#   1. IDOR check (two-identity access control comparison)
+#   2. Full authenticated active scan against the OpenAPI-defined endpoints
+#   3. HTML report
+
+env:
+  contexts:
+    - name: "healthcare-api"
+      urls:
+        - "http://host.docker.internal:4000/api"
+  parameters:
+    failOnError: false
+    progressToStdout: true
+
+jobs:
+  # --- 1. Inject Doctor B's token for the IDOR check ---
+  - type: requestor
+    requests:
+      - name: "idor-check-doctorB-reads-doctorA-patient"
+        url: "http://host.docker.internal:4000/api/patients/1"
+        method: "GET"
+        headers:
+          - "Authorization: Bearer REPLACE_WITH_DOCTOR_B_TOKEN"
+        responseCode: 403
+        
+
+  # --- 2. Inject Doctor A's token for the main authenticated active scan ---
+  - type: replacer
+    parameters:
+      deleteAllRules: false
+    rules:
+      - description: "Add JWT Bearer token (Doctor A) to all subsequent requests"
+        matchType: "REQ_HEADER"
+        matchString: "Authorization"
+        matchRegex: false
+        replacementString: "Bearer REPLACE_WITH_DOCTOR_A_TOKEN"
+
+  # --- 3. Import the API definition (generates requests for every
+  #        endpoint instead of relying on spidering, which cannot
+  #        discover a pure JSON API) ---
+  - type: openapi
+    parameters:
+      apiFile: "/zap/wrk/openapi-spec.yaml"
+      targetUrl: "http://host.docker.internal:4000/api"
+      context: "healthcare-api"
+
+  # --- 4. Actively scan everything the OpenAPI import found ---
+  - type: activeScan
+    parameters:
+      context: "healthcare-api"
+      policy: "Default Policy"
+
+  # --- 5. Report ---
+  - type: report
+    parameters:
+      template: "traditional-html"
+      reportDir: "/zap/wrk"
+      reportFile: "zap-combined-report"
+      reportTitle: "Clinico Healthcare Portal - Combined Authenticated Scan"
