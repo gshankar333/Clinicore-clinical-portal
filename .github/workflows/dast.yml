@@ -95,7 +95,7 @@ jobs:
       - name: ZAP authenticated scan + IDOR check
         run: |
           docker run --network host -v "${{ github.workspace }}:/zap/wrk/:rw" zaproxy/zap-stable \
-            zap.sh -cmd -autorun /zap/wrk/zap-automation-plan.ci.yaml || true
+            zap.sh -cmd -autorun /zap/wrk/zap-automation-plan.ci.yaml -port 8090|| true
 
       - name: Upload all ZAP reports
         if: always()
