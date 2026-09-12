@@ -8,6 +8,7 @@ on:
       - 'docker-compose.yml'
       - 'openapi-spec.yaml'
       - 'zap-automation-plan.yaml'
+      - '.github/workflows/dast.yml'
   pull_request:
     paths:
       - 'backend/**'
