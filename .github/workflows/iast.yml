@@ -4,7 +4,8 @@ on:
   push:
     paths:
       - 'backend/**'
-      - '.github/workflows/iast.yml'
+      - '.github/workflows/**'
+      
   pull_request:
     paths:
       - 'backend/**'
