@@ -64,8 +64,7 @@ function installFetchTaintCheck() {
 
 /**
  * A08 - code injection. Wraps the global Function constructor in a Proxy
- * that only traps `construct` (i.e. `new Function(...)`) - everything
- * else passes straight through to the original, so normal JS engine
+ * that only traps `construct` - everything else passes straight through to the original, so normal JS engine
  * internals that rely on Function are unaffected. Flags when the
  * function body string contains a value from request input.
  */

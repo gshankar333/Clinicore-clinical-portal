@@ -91,7 +91,7 @@ function behavioralMiddleware() {
       try {
         checkMissingAuditLog(req, res);
         checkFailOpenExport(req, res);
-        checkIdor(req, res); // fire-and-forget; internal errors are caught
+        checkIdor(req, res); 
       } catch (err) {
         // Instrumentation must never break the app it's monitoring.
       }
