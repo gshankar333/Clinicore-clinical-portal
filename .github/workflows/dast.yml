@@ -22,6 +22,12 @@ jobs:
   dast:
     name: OWASP ZAP - baseline, authenticated scan, and IDOR check
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
