@@ -1,4 +1,10 @@
 require('dotenv').config();
+
+const iast = require('./iast');
+if (process.env.IAST_MODE === 'on') {
+  iast.install();
+}
+
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
@@ -8,6 +14,10 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+if (process.env.IAST_MODE === 'on') {
+  app.use(iast.middleware());
+}
 
 app.use('/api', routes);
 

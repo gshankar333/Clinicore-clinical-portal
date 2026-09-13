@@ -1,2 +1,3 @@
 *.ci.yaml
 *-report.html
+*.jsonl

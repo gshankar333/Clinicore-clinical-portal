@@ -1,0 +1,99 @@
+name: IAST - Runtime taint tracking, API audit, and behavioral monitoring
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/iast.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+permissions:
+  contents: read
+
+jobs:
+  iast:
+    name: Runtime taint tracking, API audit, and behavioral monitoring
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U $POSTGRES_USER"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Apply schema and seed data
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+        run: |
+          node db/run-sql.js db/schema.sql
+          node db/run-sql.js db/seed.sql
+          node db/reset-demo-data.js
+          node db/seed-demo-full.js
+
+      - name: Start backend with IAST instrumentation enabled
+        working-directory: backend
+        env:
+          PORT: 4000
+          DATABASE_URL: postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
+          IAST_MODE: ${{ secrets.IAST_MODE }}
+          IAST_LOG_PATH: ${{ github.workspace }}/backend/iast-findings.jsonl
+        run: |
+          nohup env IAST_MODE=on DATABASE_URL="$DATABASE_URL" JWT_SECRET="$JWT_SECRET" JWT_EXPIRES_IN="$JWT_EXPIRES_IN" IAST_LOG_PATH="$IAST_LOG_PATH" node src/server.js > server.log 2>&1 &
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:4000/api/health > /dev/null; then
+              echo "Backend is up."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend did not become ready in time."
+          cat server.log
+          exit 1
+
+      - name: Exercise every OWASP Top 10 vulnerability
+        working-directory: backend
+        run: node scripts/iast-exercise.js
+
+      - name: Verify all expected IAST findings fired
+        working-directory: backend
+        env:
+          IAST_LOG_PATH: ${{ github.workspace }}/backend/iast-findings.jsonl
+        run: node scripts/verify-iast-findings.js
+
+      - name: Upload IAST findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iast-findings
+          path: backend/iast-findings.jsonl
+
+      - name: Dump backend log on failure
+        if: failure()
+        run: cat backend/server.log
