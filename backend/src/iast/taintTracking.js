@@ -3,7 +3,7 @@ const context = require('./context');
 const { logFinding } = require('./findingsLogger');
 
 /**
- * A05 - SQL injection. Patches pg.Pool.prototype.query to check whether
+ * SQL injection- Patches pg.Pool.prototype.query to check whether
  * the query TEXT contains a value that came directly from this request's
  * input, embedded into the string rather than passed as a $1/$2
  * parameter. Also detects writes to audit_logs, used by the behavioral
@@ -37,7 +37,7 @@ function installQueryTaintCheck() {
 }
 
 /**
- * A01 - SSRF. Patches the global fetch() to check whether the URL came
+ * SSRF- Patches the global fetch() to check whether the URL came
  * directly from request input, with no allow-list applied.
  */
 function installFetchTaintCheck() {
@@ -63,7 +63,7 @@ function installFetchTaintCheck() {
 }
 
 /**
- * A08 - code injection. Wraps the global Function constructor in a Proxy
+ * code injection- Wraps the global Function constructor in a Proxy
  * that only traps `construct` - everything else passes straight through to the original, so normal JS engine
  * internals that rely on Function are unaffected. Flags when the
  * function body string contains a value from request input.

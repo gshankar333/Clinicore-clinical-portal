@@ -5,6 +5,11 @@ if (process.env.IAST_MODE === 'on') {
   iast.install();
 }
 
+const rasp = require('./rasp');
+if (process.env.RASP_MODE === 'on') {
+  rasp.install();
+}
+
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
@@ -19,7 +24,15 @@ if (process.env.IAST_MODE === 'on') {
   app.use(iast.middleware());
 }
 
+if (process.env.RASP_MODE === 'on') {
+  app.use(rasp.taintMiddleware());
+}
+
 app.use('/api', routes);
+
+if (process.env.RASP_MODE === 'on') {
+  app.use(rasp.errorHandler());
+}
 
 app.use(errorHandler);
 
