@@ -9,9 +9,7 @@ name: RASP - Production Simulation
 
 on:
   push:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/rasp.yml'
+
   pull_request:
     paths:
       - 'backend/**'

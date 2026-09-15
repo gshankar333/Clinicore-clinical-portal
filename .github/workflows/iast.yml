@@ -2,9 +2,6 @@ name: IAST - Runtime taint tracking, API audit, and behavioral monitoring
 
 on:
   push:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/**'
       
   pull_request:
     paths:
