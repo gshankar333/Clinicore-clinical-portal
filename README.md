@@ -48,9 +48,6 @@ All four are wired into GitHub Actions and confirmed running successfully
 - Verified: `npm run build` succeeds; frontend dev server + Vite proxy
   correctly forwards `/api/*` to the backend (tested live, not just built)
 
-## Application security pipeline workflow
-<img width="722" height="906" alt="overall_project_workflow" src="https://github.com/user-attachments/assets/6b2a8e5a-34a1-423b-add7-d2d407cb738f" />
-
 ## OWASP Top 10:2025 - End-to-End Implementation, Exploitation & Verification
 
 Every vulnerability below was manually exploited with a real proof-of-concept
